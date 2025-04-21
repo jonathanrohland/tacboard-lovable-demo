@@ -2,16 +2,16 @@
 import React from "react";
 
 type MarbleProps = {
-  color: string; // e.g. "red", "blue"
+  color: string;
   size?: number;
   selected?: boolean;
 };
 
-const Marble: React.FC<MarbleProps> = ({ color, size = 32, selected }) => (
+const Marble: React.FC<MarbleProps> = ({ color, size = 48, selected }) => (
   <circle
     cx={size / 2}
     cy={size / 2}
-    r={size / 2 - 3}
+    r={size / 2 - 4}
     fill={color}
     stroke="#fff"
     strokeWidth={selected ? 4 : 2}

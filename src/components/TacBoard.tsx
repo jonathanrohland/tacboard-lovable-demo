@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import BoardField from "./BoardField";
 import { Undo } from "lucide-react";
@@ -29,6 +28,20 @@ const TARGET_STARTS = [
 
 // The 64 outer fields: circle with 264px radius
 function getCirclePos(idx: number, total = 64, center = 300, radius = 220) {
+  const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
+  return {
+    x: center + radius * Math.cos(angle),
+    y: center + radius * Math.sin(angle),
+  };
+}
+
+// Increase board and field sizes
+const BOARD_SIZE = 800; // Increased from 600
+const FIELD_SIZE = 48; // Increased from 36
+const CENTER = BOARD_SIZE / 2;
+const CIRCLE_RADIUS = 320; // Increased from 220
+
+function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE_RADIUS) {
   const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
   return {
     x: center + radius * Math.cos(angle),
@@ -99,7 +112,7 @@ const TacBoard: React.FC = () => {
   // Helper for finding field's location on board
   function fieldPos(field: Field) {
     if (field.type === "circle") {
-      return getCirclePos(field.idx);
+      return getCirclePos2(field.idx);
     }
     if (field.type === "target") {
       const start = TARGET_STARTS[field.player];
@@ -111,10 +124,10 @@ const TacBoard: React.FC = () => {
     }
     if (field.type === "home") {
       // arrange in 2x2 at corners, 36px apart
-      const base = HOME_POSITIONS[field.player];
+      const base = HOME_POSITIONS2[field.player];
       return {
-        x: base.x + 36 * (field.idx % 2),
-        y: base.y + 36 * Math.floor(field.idx / 2),
+        x: base.x + 48 * (field.idx % 2),
+        y: base.y + 48 * Math.floor(field.idx / 2),
       };
     }
     return { x: 0, y: 0 };
@@ -180,9 +193,23 @@ const TacBoard: React.FC = () => {
     setSelected(null);
   }
 
+  // Update target and home positions to match new board size
+  const HOME_POSITIONS2 = [
+    { x: 64, y: 64 }, // TL
+    { x: BOARD_SIZE - 128, y: 64 }, // TR
+    { x: BOARD_SIZE - 128, y: BOARD_SIZE - 128 }, // BR
+    { x: 64, y: BOARD_SIZE - 128 }, // BL
+  ];
+
+  const TARGET_STARTS = [
+    { x: CENTER, y: 98, dx: 0, dy: 48 }, // top down
+    { x: BOARD_SIZE - 98, y: CENTER, dx: -48, dy: 0 }, // right left
+    { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -48 }, // bottom up
+    { x: 98, y: CENTER, dx: 48, dy: 0 }, // left right
+  ];
+
   // Board background and layout:
-  const BOARD_SIZE = 600;
-  const FIELD_SIZE = 36;
+  const FIELD_SIZE2 = 36;
 
   // Compose SVG layers
   return (
@@ -203,16 +230,17 @@ const TacBoard: React.FC = () => {
           viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
           className="block z-10 pointer-events-auto"
         >
-          {/* Main circle & "flower lines" (simplified) */}
+          {/* Main circle */}
           <circle
-            cx={300}
-            cy={300}
-            r={220}
+            cx={CENTER}
+            cy={CENTER}
+            r={CIRCLE_RADIUS}
             fill="#f8f8f6"
             stroke="#b19765"
             strokeWidth={5}
           />
-          {/* Outer dots/fields */}
+          
+          {/* Render fields with updated sizes and positions */}
           {fields
             .filter(f => f.type === "circle")
             .map((field, i) => {
@@ -230,6 +258,7 @@ const TacBoard: React.FC = () => {
                 />
               );
             })}
+          
           {/* Target areas */}
           {fields
             .filter(f => f.type === "target")
@@ -273,6 +302,7 @@ const TacBoard: React.FC = () => {
               );
             })}
         </svg>
+        
         {/* Undo button */}
         <button
           className="absolute bottom-6 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
@@ -290,4 +320,3 @@ const TacBoard: React.FC = () => {
 };
 
 export default TacBoard;
-
