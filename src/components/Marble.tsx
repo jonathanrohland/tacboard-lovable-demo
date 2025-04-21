@@ -7,11 +7,11 @@ type MarbleProps = {
   selected?: boolean;
 };
 
-const Marble: React.FC<MarbleProps> = ({ color, size = 48, selected }) => (
+const Marble: React.FC<MarbleProps> = ({ color, size = 36, selected }) => (
   <circle
     cx={size / 2}
     cy={size / 2}
-    r={size / 2 - 4}
+    r={size / 2 - 3}
     fill={color}
     stroke="#fff"
     strokeWidth={selected ? 4 : 2}

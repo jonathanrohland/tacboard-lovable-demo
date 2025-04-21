@@ -37,7 +37,7 @@ function getCirclePos(idx: number, total = 64, center = 300, radius = 220) {
 
 // Increase board and field sizes
 const BOARD_SIZE = 800; // Increased from 600
-const FIELD_SIZE = 48; // Increased from 36
+const FIELD_SIZE = 36; // Reduced back to 36
 const CENTER = BOARD_SIZE / 2;
 const CIRCLE_RADIUS = 320; // Increased from 220
 
@@ -193,7 +193,7 @@ const TacBoard: React.FC = () => {
     setSelected(null);
   }
 
-  // Update target and home positions to match new board size
+  // Update target and home positions to match reduced field size
   const HOME_POSITIONS2 = [
     { x: 64, y: 64 }, // TL
     { x: BOARD_SIZE - 128, y: 64 }, // TR
@@ -202,10 +202,10 @@ const TacBoard: React.FC = () => {
   ];
 
   const TARGET_STARTS = [
-    { x: CENTER, y: 98, dx: 0, dy: 48 }, // top down
-    { x: BOARD_SIZE - 98, y: CENTER, dx: -48, dy: 0 }, // right left
-    { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -48 }, // bottom up
-    { x: 98, y: CENTER, dx: 48, dy: 0 }, // left right
+    { x: CENTER, y: 98, dx: 0, dy: 36 }, // top down (adjusted dy)
+    { x: BOARD_SIZE - 98, y: CENTER, dx: -36, dy: 0 }, // right left (adjusted dx)
+    { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -36 }, // bottom up (adjusted dy)
+    { x: 98, y: CENTER, dx: 36, dy: 0 }, // left right (adjusted dx)
   ];
 
   // Board background and layout:

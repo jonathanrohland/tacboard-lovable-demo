@@ -16,7 +16,7 @@ type BoardFieldProps = {
 };
 
 const BoardField: React.FC<BoardFieldProps> = ({
-  x, y, marble, isSelected, isHome, isTarget, size = 48, onClick, highlight, bgColor
+  x, y, marble, isSelected, isHome, isTarget, size = 36, onClick, highlight, bgColor
 }) => {
   return (
     <g
