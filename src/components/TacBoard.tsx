@@ -82,7 +82,9 @@ function cloneFields(fields: Field[]) {
 
 function findFirstHomeSlot(fields: Field[], player: number): number | null {
   for (let i = 0; i < fields.length; i++) {
-    if (fields[i].type === "home" && fields[i].player === player && !fields[i].marble) {
+    const field = fields[i];
+    // Only check fields of type "home" that belong to the player and are empty
+    if (field.type === "home" && field.player === player && !field.marble) {
       return i;
     }
   }
@@ -119,7 +121,7 @@ const TacBoard: React.FC = () => {
   }
 
   function isValidMove(from: Field, to: Field, marble: MarbleObj) {
-    // Return false for forbidden home/target moves.
+    // Check if target or home belongs to the right player
     if (to.type === "target" && to.player !== marble.player) return false;
     if (to.type === "home" && to.player !== marble.player) return false;
     // No other validation requested.
@@ -288,3 +290,4 @@ const TacBoard: React.FC = () => {
 };
 
 export default TacBoard;
+
