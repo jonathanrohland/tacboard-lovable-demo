@@ -4,7 +4,7 @@ import BoardField from "./BoardField";
 import { Undo } from "lucide-react";
 import { socketService } from "@/services/socketService";
 import { Field, MarbleObj } from "@/types/game";
-import { saveGameState } from "@/utils/gameState";
+import { saveGameState, getGameState, setGameState } from "@/utils/gameState";
 import { useSearchParams } from "react-router-dom";
 import GameController from "./GameController";
 
@@ -98,13 +98,35 @@ const TacBoard: React.FC = () => {
   const [selected, setSelected] = useState<number | null>(null);
   const [history, setHistory] = useState<Field[][]>([]);
 
-  // Update game state when fields change
+  // Fetch initial state from Supabase (or fallback to local storage)
   useEffect(() => {
-    // Only send updates if we're in a game
-    if (gameId) {
-      socketService.sendUpdate(fields);
-      saveGameState(gameId, fields);
-    }
+    if (!gameId) return; // no game to sync
+    let mounted = true;
+    (async () => {
+      // Try Supabase first
+      const supabaseFields = await getGameState(gameId);
+      if (supabaseFields && mounted) {
+        setFields(supabaseFields);
+        return;
+      }
+      // Fall back to localStorage
+      const localFields = loadGameState(gameId);
+      if (localFields && mounted) setFields(localFields);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [gameId]);
+
+  // Update game state in Supabase+localStorage when fields change
+  useEffect(() => {
+    if (!gameId) return;
+    // Write to local storage for offline play
+    saveGameState(gameId, fields);
+    // Write to Supabase
+    setGameState(gameId, fields);
+    // WebSocket broadcast for live updates
+    socketService.sendUpdate(fields);
   }, [fields, gameId]);
 
   // Helper for finding field's location on board
