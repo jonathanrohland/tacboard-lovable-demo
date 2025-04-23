@@ -1,6 +1,12 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect, useCallback } from "react";
 import BoardField from "./BoardField";
 import { Undo } from "lucide-react";
+import { socketService } from "@/services/socketService";
+import { Field, MarbleObj } from "@/types/game";
+import { saveGameState } from "@/utils/gameState";
+import { useSearchParams } from "react-router-dom";
+import GameController from "./GameController";
 
 // Main colors per player (red, blue, green, yellow)
 const PLAYER_COLORS = [
@@ -26,20 +32,11 @@ const TARGET_STARTS = [
   { x: 98, y: 300, dx: 32, dy: 0 }, // left right
 ];
 
-// The 64 outer fields: circle with 264px radius
-function getCirclePos(idx: number, total = 64, center = 300, radius = 220) {
-  const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
-  return {
-    x: center + radius * Math.cos(angle),
-    y: center + radius * Math.sin(angle),
-  };
-}
-
-// Increase board and field sizes
-const BOARD_SIZE = 800; // Increased from 600
-const FIELD_SIZE = 36; // Reduced back to 36
+// Board and field sizes
+const BOARD_SIZE = 800;
+const FIELD_SIZE = 36;
 const CENTER = BOARD_SIZE / 2;
-const CIRCLE_RADIUS = 320; // Increased from 220
+const CIRCLE_RADIUS = 320;
 
 function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE_RADIUS) {
   const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
@@ -48,16 +45,6 @@ function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE
     y: center + radius * Math.sin(angle),
   };
 }
-
-type MarbleObj = {
-  color: string;
-  player: number; // 0–3
-};
-
-type Field =
-  | { type: "circle"; idx: number; marble?: MarbleObj }
-  | { type: "target"; player: number; idx: number; marble?: MarbleObj }
-  | { type: "home"; player: number; idx: number; marble?: MarbleObj };
 
 function initialFields(): Field[] {
   // Circle: 64 fields, empty
@@ -105,9 +92,20 @@ function findFirstHomeSlot(fields: Field[], player: number): number | null {
 }
 
 const TacBoard: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const gameId = searchParams.get('game');
   const [fields, setFields] = useState<Field[]>(initialFields());
-  const [selected, setSelected] = useState<number | null>(null); // field idx in array
+  const [selected, setSelected] = useState<number | null>(null);
   const [history, setHistory] = useState<Field[][]>([]);
+
+  // Update game state when fields change
+  useEffect(() => {
+    // Only send updates if we're in a game
+    if (gameId) {
+      socketService.sendUpdate(fields);
+      saveGameState(gameId, fields);
+    }
+  }, [fields, gameId]);
 
   // Helper for finding field's location on board
   function fieldPos(field: Field) {
@@ -141,7 +139,7 @@ const TacBoard: React.FC = () => {
     return true;
   }
 
-  function onFieldClick(idx: number) {
+  const onFieldClick = useCallback((idx: number) => {
     const f = fields[idx];
     if (selected == null) {
       // Pick up if marble
@@ -184,7 +182,7 @@ const TacBoard: React.FC = () => {
     next[selected].marble = undefined;
     setFields(next);
     setSelected(null);
-  }
+  }, [fields, selected]);
 
   function handleUndo() {
     if (history.length === 0) return;
@@ -208,112 +206,123 @@ const TacBoard: React.FC = () => {
     { x: 98, y: CENTER, dx: 36, dy: 0 }, // left right (adjusted dx)
   ];
 
-  // Board background and layout:
-  const FIELD_SIZE2 = 36;
+  // Handle fields update from the game controller
+  const handleFieldsUpdate = useCallback((updatedFields: Field[]) => {
+    setFields(updatedFields);
+    setSelected(null);
+  }, []);
 
-  // Compose SVG layers
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="relative shadow-xl" style={{ width: BOARD_SIZE, height: BOARD_SIZE }}>
-        {/* Wood BG */}
-        <img
-          src="/lovable-uploads/6bdc1463-fdb3-45f1-96f1-af0281030cd6.png"
-          alt="Tac Board"
-          className="absolute left-0 top-0 w-full h-full object-cover rounded-xl z-0"
-          draggable={false}
-          style={{ opacity: 0.22, pointerEvents: "none" }}
-        />
-        {/* SVG Overlay */}
-        <svg
-          width={BOARD_SIZE}
-          height={BOARD_SIZE}
-          viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
-          className="block z-10 pointer-events-auto"
-        >
-          {/* Main circle */}
-          <circle
-            cx={CENTER}
-            cy={CENTER}
-            r={CIRCLE_RADIUS}
-            fill="#f8f8f6"
-            stroke="#b19765"
-            strokeWidth={5}
-          />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
+        <div className="md:col-span-2 flex flex-col items-center">
+          <div className="relative shadow-xl" style={{ width: BOARD_SIZE, height: BOARD_SIZE }}>
+            {/* Wood BG */}
+            <img
+              src="/lovable-uploads/6bdc1463-fdb3-45f1-96f1-af0281030cd6.png"
+              alt="Tac Board"
+              className="absolute left-0 top-0 w-full h-full object-cover rounded-xl z-0"
+              draggable={false}
+              style={{ opacity: 0.22, pointerEvents: "none" }}
+            />
+            {/* SVG Overlay */}
+            <svg
+              width={BOARD_SIZE}
+              height={BOARD_SIZE}
+              viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
+              className="block z-10 pointer-events-auto"
+            >
+              {/* Main circle */}
+              <circle
+                cx={CENTER}
+                cy={CENTER}
+                r={CIRCLE_RADIUS}
+                fill="#f8f8f6"
+                stroke="#b19765"
+                strokeWidth={5}
+              />
+              
+              {/* Render fields with updated sizes and positions */}
+              {fields
+                .filter(f => f.type === "circle")
+                .map((field, i) => {
+                  const { x, y } = fieldPos(field);
+                  return (
+                    <BoardField
+                      key={"c-" + i}
+                      x={x}
+                      y={y}
+                      marble={field.marble ?? undefined}
+                      isSelected={selected === i}
+                      onClick={() => onFieldClick(i)}
+                      size={FIELD_SIZE}
+                      highlight={selected !== null}
+                    />
+                  );
+                })}
+              
+              {/* Target areas */}
+              {fields
+                .filter(f => f.type === "target")
+                .map((field, i) => {
+                  const idx = fields.indexOf(field);
+                  const { x, y } = fieldPos(field);
+                  return (
+                    <BoardField
+                      key={"t-" + i}
+                      x={x}
+                      y={y}
+                      marble={field.marble ?? undefined}
+                      isSelected={selected === idx}
+                      isTarget
+                      bgColor="#e3eeff"
+                      onClick={() => onFieldClick(idx)}
+                      size={FIELD_SIZE}
+                      highlight={selected !== null}
+                    />
+                  );
+                })}
+              {/* Home/corner areas */}
+              {fields
+                .filter(f => f.type === "home")
+                .map((field, i) => {
+                  const idx = fields.indexOf(field);
+                  const { x, y } = fieldPos(field);
+                  return (
+                    <BoardField
+                      key={"h-" + i}
+                      x={x}
+                      y={y}
+                      marble={field.marble ?? undefined}
+                      isSelected={selected === idx}
+                      isHome
+                      bgColor="#fafafb"
+                      onClick={() => onFieldClick(idx)}
+                      size={FIELD_SIZE}
+                      highlight={selected !== null}
+                    />
+                  );
+                })}
+            </svg>
+            
+            {/* Undo button */}
+            <button
+              className="absolute bottom-6 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
+              onClick={handleUndo}
+              title="Undo"
+            >
+              <Undo size={28} className="text-blue-600" />
+            </button>
+          </div>
           
-          {/* Render fields with updated sizes and positions */}
-          {fields
-            .filter(f => f.type === "circle")
-            .map((field, i) => {
-              const { x, y } = fieldPos(field);
-              return (
-                <BoardField
-                  key={"c-" + i}
-                  x={x}
-                  y={y}
-                  marble={field.marble ?? undefined}
-                  isSelected={selected === i}
-                  onClick={() => onFieldClick(i)}
-                  size={FIELD_SIZE}
-                  highlight={selected !== null}
-                />
-              );
-            })}
-          
-          {/* Target areas */}
-          {fields
-            .filter(f => f.type === "target")
-            .map((field, i) => {
-              const idx = fields.indexOf(field);
-              const { x, y } = fieldPos(field);
-              return (
-                <BoardField
-                  key={"t-" + i}
-                  x={x}
-                  y={y}
-                  marble={field.marble ?? undefined}
-                  isSelected={selected === idx}
-                  isTarget
-                  bgColor="#e3eeff"
-                  onClick={() => onFieldClick(idx)}
-                  size={FIELD_SIZE}
-                  highlight={selected !== null}
-                />
-              );
-            })}
-          {/* Home/corner areas */}
-          {fields
-            .filter(f => f.type === "home")
-            .map((field, i) => {
-              const idx = fields.indexOf(field);
-              const { x, y } = fieldPos(field);
-              return (
-                <BoardField
-                  key={"h-" + i}
-                  x={x}
-                  y={y}
-                  marble={field.marble ?? undefined}
-                  isSelected={selected === idx}
-                  isHome
-                  bgColor="#fafafb"
-                  onClick={() => onFieldClick(idx)}
-                  size={FIELD_SIZE}
-                  highlight={selected !== null}
-                />
-              );
-            })}
-        </svg>
+          <div className="mt-5 text-gray-600 text-md">
+            Click a marble to pick it up, then click another field to drop it. If a marble is already on the target field, it is sent home.
+          </div>
+        </div>
         
-        {/* Undo button */}
-        <button
-          className="absolute bottom-6 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
-          onClick={handleUndo}
-          title="Undo"
-        >
-          <Undo size={28} className="text-blue-600" />
-        </button>
-      </div>
-      <div className="mt-5 text-gray-600 text-md">
-        Click a marble to pick it up, then click another field to drop it. If a marble is already on the target field, it is sent home.
+        <div className="md:col-span-1">
+          <GameController initialFields={initialFields()} onFieldsUpdate={handleFieldsUpdate} />
+        </div>
       </div>
     </div>
   );
