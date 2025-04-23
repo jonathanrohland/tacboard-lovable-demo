@@ -6,8 +6,9 @@ import { generateGameId, loadGameState, saveGameState } from '@/utils/gameState'
 import { Field, GameState } from '@/types/game';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Share2, CopyIcon, RefreshCw } from 'lucide-react';
+import { Share2, CopyIcon, RefreshCw, WifiOff } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface GameControllerProps {
   initialFields: Field[];
@@ -21,7 +22,9 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     return searchParams.get('game') || '';
   });
   const [isConnected, setIsConnected] = useState(false);
+  const [isLocalOnly, setIsLocalOnly] = useState(false);
   const [joinInput, setJoinInput] = useState('');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // On first load, check if we have a game ID in the URL
   useEffect(() => {
@@ -32,14 +35,32 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
 
   // Socket connection handling
   useEffect(() => {
-    const handleConnect = () => {
+    const handleConnect = (data: any) => {
       setIsConnected(true);
-      toast.success('Connected to game');
+      setConnectionError(null);
+      setIsLocalOnly(!!data.localOnly);
+      
+      if (data.localOnly) {
+        toast.info('Using local storage only (changes won\'t sync to other players)');
+      } else {
+        toast.success('Connected to game');
+      }
     };
     
-    const handleDisconnect = () => {
+    const handleDisconnect = (data: any) => {
       setIsConnected(false);
-      toast.error('Disconnected from game');
+      setConnectionError(`Disconnected (code: ${data.code}${data.reason ? ', ' + data.reason : ''})`);
+    };
+    
+    const handleError = (data: any) => {
+      setConnectionError(`Connection error: ${data.error || 'Unknown error'}`);
+      toast.error(`Connection error: ${data.error || 'Unknown error'}`);
+    };
+    
+    const handleFallback = () => {
+      setIsLocalOnly(true);
+      setConnectionError('Unable to connect to sync server, using local storage only');
+      toast.warning('Unable to connect to sync server. Game changes will only be saved locally.');
     };
     
     const handleGameUpdate = (data: any) => {
@@ -50,11 +71,15 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     
     socketService.on('connected', handleConnect);
     socketService.on('disconnected', handleDisconnect);
+    socketService.on('error', handleError);
+    socketService.on('fallback', handleFallback);
     socketService.on('gameUpdate', handleGameUpdate);
     
     return () => {
       socketService.off('connected', handleConnect);
       socketService.off('disconnected', handleDisconnect);
+      socketService.off('error', handleError);
+      socketService.off('fallback', handleFallback);
       socketService.off('gameUpdate', handleGameUpdate);
       socketService.disconnect();
     };
@@ -75,6 +100,9 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     if (!id) return;
     
     socketService.disconnect();
+    setConnectionError(null);
+    setIsLocalOnly(false);
+    
     socketService.connect(id);
     setGameId(id);
     navigate(`/?game=${id}`, { replace: true });
@@ -109,10 +137,17 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium">Game Controls</h3>
           {isConnected ? (
-            <span className="inline-flex items-center text-sm text-green-600">
-              <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
-              Connected
-            </span>
+            isLocalOnly ? (
+              <span className="inline-flex items-center text-sm text-amber-600">
+                <WifiOff size={16} className="mr-1" />
+                Local Only
+              </span>
+            ) : (
+              <span className="inline-flex items-center text-sm text-green-600">
+                <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
+                Connected
+              </span>
+            )
           ) : (
             <span className="inline-flex items-center text-sm text-red-600">
               <span className="w-2 h-2 bg-red-600 rounded-full mr-1"></span>
@@ -120,6 +155,16 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
             </span>
           )}
         </div>
+        
+        {connectionError && (
+          <Alert variant="destructive" className="py-2">
+            <AlertTitle className="text-sm font-medium">Connection Error</AlertTitle>
+            <AlertDescription className="text-xs">
+              {connectionError}
+              {isLocalOnly && " - Changes will only be saved locally"}
+            </AlertDescription>
+          </Alert>
+        )}
         
         {gameId ? (
           <div className="border border-gray-200 rounded p-2 bg-gray-50 flex items-center justify-between">
