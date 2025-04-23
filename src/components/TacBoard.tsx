@@ -4,7 +4,7 @@ import BoardField from "./BoardField";
 import { Undo } from "lucide-react";
 import { socketService } from "@/services/socketService";
 import { Field, MarbleObj } from "@/types/game";
-import { saveGameState, getGameState, setGameState } from "@/utils/gameState";
+import { saveGameState, getGameState, setGameState, loadGameState } from "@/utils/gameState";
 import { useSearchParams } from "react-router-dom";
 import GameController from "./GameController";
 
