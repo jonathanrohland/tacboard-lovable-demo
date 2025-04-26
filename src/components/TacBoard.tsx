@@ -39,10 +39,10 @@ const CIRCLE_RADIUS = 320;
 
 // Update target and home positions to match reduced field size
 const HOME_POSITIONS2 = [
-  { x: 48, y: 48 }, // TL
-  { x: BOARD_SIZE - 112, y: 48 }, // TR
-  { x: BOARD_SIZE - 112, y: BOARD_SIZE - 112 }, // BR
-  { x: 48, y: BOARD_SIZE - 112 }, // BL
+  { x: 24, y: 24 }, // TL - moved closer to top-left corner
+  { x: BOARD_SIZE - 84, y: 24 }, // TR - moved closer to top-right corner
+  { x: BOARD_SIZE - 84, y: BOARD_SIZE - 84 }, // BR - moved closer to bottom-right corner
+  { x: 24, y: BOARD_SIZE - 84 }, // BL - moved closer to bottom-left corner
 ];
 
 // Target starts positions
@@ -182,11 +182,11 @@ const TacBoard: React.FC = () => {
       };
     }
     if (field.type === "home") {
-      // arrange in 2x2 at corners, 36px apart
+      // Reduce spacing between marbles from 48px to 36px
       const base = HOME_POSITIONS2[field.player];
       return {
-        x: base.x + 48 * (field.idx % 2),
-        y: base.y + 48 * Math.floor(field.idx / 2),
+        x: base.x + 36 * (field.idx % 2),
+        y: base.y + 36 * Math.floor(field.idx / 2),
       };
     }
     return { x: 0, y: 0 };
