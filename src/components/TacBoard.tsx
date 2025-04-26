@@ -39,10 +39,10 @@ const CIRCLE_RADIUS = 320;
 
 // Update target and home positions to match reduced field size
 const HOME_POSITIONS2 = [
-  { x: 24, y: 24 }, // TL - moved closer to top-left corner
-  { x: BOARD_SIZE - 84, y: 24 }, // TR - moved closer to top-right corner
-  { x: BOARD_SIZE - 84, y: BOARD_SIZE - 84 }, // BR - moved closer to bottom-right corner
-  { x: 24, y: BOARD_SIZE - 84 }, // BL - moved closer to bottom-left corner
+  { x: 36, y: 36 }, // TL - Red player, moved slightly from corner
+  { x: BOARD_SIZE - 72, y: 36 }, // TR - Blue player, moved slightly from top border
+  { x: BOARD_SIZE - 72, y: BOARD_SIZE - 72 }, // BR - Green player (already perfect)
+  { x: 36, y: BOARD_SIZE - 72 }, // BL - Yellow player, moved slightly from left border
 ];
 
 // Target starts positions
