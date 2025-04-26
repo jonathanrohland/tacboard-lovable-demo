@@ -1,65 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
-import BoardField from "./BoardField";
-import { Undo } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { socketService } from "@/services/socketService";
 import { Field, MarbleObj } from "@/types/game";
-import { saveGameState, getGameState, setGameState, loadGameState } from "@/utils/gameState";
-import { useSearchParams } from "react-router-dom";
+import { saveGameState, getGameState, loadGameState } from "@/utils/gameState";
 import GameController from "./GameController";
-
-// Main colors per player (red, blue, green, yellow)
-const PLAYER_COLORS = [
-  "#ef4444", // red
-  "#3b82f6", // blue
-  "#22c55e", // green
-  "#eab308", // yellow
-];
-
-// Home/target areas per player
-const HOME_POSITIONS = [
-  { x: 48, y: 48 }, // TL
-  { x: 552, y: 48 }, // TR
-  { x: 552, y: 552 }, // BR
-  { x: 48, y: 552 }, // BL
-];
-
-// Target areas: placed at right/left/up/down of center (center 300,300, offset to fit)
-const TARGET_STARTS = [
-  { x: 300, y: 98, dx: 0, dy: 32 }, // top down
-  { x: 502, y: 300, dx: -32, dy: 0 }, // right left
-  { x: 300, y: 502, dx: 0, dy: -32 }, // bottom up
-  { x: 98, y: 300, dx: 32, dy: 0 }, // left right
-];
-
-// Board and field sizes
-const BOARD_SIZE = 800;
-const FIELD_SIZE = 36;
-const CENTER = BOARD_SIZE / 2;
-const CIRCLE_RADIUS = 320;
-
-// Update target and home positions to match reduced field size
-const HOME_POSITIONS2 = [
-  { x: 48, y: 48 }, // TL
-  { x: BOARD_SIZE - 112, y: 48 }, // TR
-  { x: BOARD_SIZE - 112, y: BOARD_SIZE - 112 }, // BR
-  { x: 48, y: BOARD_SIZE - 112 }, // BL
-];
-
-// Target starts positions
-const TARGET_STARTS2 = [
-  { x: CENTER, y: 120, dx: 0, dy: 36 }, // top down
-  { x: BOARD_SIZE - 120, y: CENTER, dx: -36, dy: 0 }, // right left
-  { x: CENTER, y: BOARD_SIZE - 120, dx: 0, dy: -36 }, // bottom up
-  { x: 120, y: CENTER, dx: 36, dy: 0 }, // left right
-];
-
-function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE_RADIUS) {
-  const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
-  return {
-    x: center + radius * Math.cos(angle),
-    y: center + radius * Math.sin(angle),
-  };
-}
+import BoardBackground from "./game/BoardBackground";
+import BoardFields from "./game/BoardFields";
+import UndoButton from "./game/UndoButton";
+import { BOARD_SIZE, PLAYER_COLORS } from "@/utils/gamePositions";
 
 function initialFields(): Field[] {
   // Circle: 64 fields, empty
@@ -113,7 +61,7 @@ const TacBoard: React.FC = () => {
   const [selected, setSelected] = useState<number | null>(null);
   const [history, setHistory] = useState<Field[][]>([]);
 
-  // Fetch initial state from Supabase (or fallback to local storage)
+  // Initial state loading effect
   useEffect(() => {
     if (!gameId) return; // no game to sync
     
@@ -146,7 +94,7 @@ const TacBoard: React.FC = () => {
     };
   }, [gameId]);
 
-  // Set up WebSocket handling for game updates
+  // WebSocket handling effect
   useEffect(() => {
     if (!gameId) return;
     
@@ -167,30 +115,6 @@ const TacBoard: React.FC = () => {
       socketService.disconnect();
     };
   }, [gameId]);
-
-  // Helper for finding field's location on board
-  function fieldPos(field: Field) {
-    if (field.type === "circle") {
-      return getCirclePos2(field.idx);
-    }
-    if (field.type === "target") {
-      const start = TARGET_STARTS2[field.player];
-      const { dx, dy } = start;
-      return {
-        x: start.x + dx * field.idx,
-        y: start.y + dy * field.idx,
-      };
-    }
-    if (field.type === "home") {
-      // arrange in 2x2 at corners, 36px apart
-      const base = HOME_POSITIONS2[field.player];
-      return {
-        x: base.x + 48 * (field.idx % 2),
-        y: base.y + 48 * Math.floor(field.idx / 2),
-      };
-    }
-    return { x: 0, y: 0 };
-  }
 
   function isValidMove(from: Field, to: Field, marble: MarbleObj) {
     // Check if target or home belongs to the right player
@@ -253,7 +177,7 @@ const TacBoard: React.FC = () => {
     }
   }, [fields, selected, gameId]);
 
-  function handleUndo() {
+  const handleUndo = () => {
     if (history.length === 0) return;
     const previousState = cloneFields(history[history.length - 1]);
     setFields(previousState);
@@ -267,7 +191,6 @@ const TacBoard: React.FC = () => {
     }
   }
 
-  // Handle fields update from the game controller
   const handleFieldsUpdate = useCallback((updatedFields: Field[]) => {
     setFields(updatedFields);
     setSelected(null);
@@ -284,102 +207,21 @@ const TacBoard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
         <div className="md:col-span-2 flex flex-col items-center">
           <div className="relative shadow-xl" style={{ width: BOARD_SIZE, height: BOARD_SIZE }}>
-            {/* Wood BG */}
-            <img
-              src="/lovable-uploads/6bdc1463-fdb3-45f1-96f1-af0281030cd6.png"
-              alt="Tac Board"
-              className="absolute left-0 top-0 w-full h-full object-cover rounded-xl z-0"
-              draggable={false}
-              style={{ opacity: 0.22, pointerEvents: "none" }}
-            />
-            {/* SVG Overlay */}
             <svg
               width={BOARD_SIZE}
               height={BOARD_SIZE}
               viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
               className="block z-10 pointer-events-auto"
             >
-              {/* Main circle */}
-              <circle
-                cx={CENTER}
-                cy={CENTER}
-                r={CIRCLE_RADIUS}
-                fill="#f8f8f6"
-                stroke="#b19765"
-                strokeWidth={5}
+              <BoardBackground />
+              <BoardFields
+                fields={fields}
+                selected={selected}
+                onFieldClick={onFieldClick}
               />
-              
-              {/* Render fields with updated sizes and positions */}
-              {fields
-                .filter(f => f.type === "circle")
-                .map((field, i) => {
-                  const { x, y } = fieldPos(field);
-                  return (
-                    <BoardField
-                      key={"c-" + i}
-                      x={x}
-                      y={y}
-                      marble={field.marble ?? undefined}
-                      isSelected={selected === i}
-                      onClick={() => onFieldClick(i)}
-                      size={FIELD_SIZE}
-                      highlight={selected !== null}
-                    />
-                  );
-                })}
-              
-              {/* Target areas */}
-              {fields
-                .filter(f => f.type === "target")
-                .map((field, i) => {
-                  const idx = fields.indexOf(field);
-                  const { x, y } = fieldPos(field);
-                  return (
-                    <BoardField
-                      key={"t-" + i}
-                      x={x}
-                      y={y}
-                      marble={field.marble ?? undefined}
-                      isSelected={selected === idx}
-                      isTarget
-                      bgColor="#e3eeff"
-                      onClick={() => onFieldClick(idx)}
-                      size={FIELD_SIZE}
-                      highlight={selected !== null}
-                    />
-                  );
-                })}
-              {/* Home/corner areas */}
-              {fields
-                .filter(f => f.type === "home")
-                .map((field, i) => {
-                  const idx = fields.indexOf(field);
-                  const { x, y } = fieldPos(field);
-                  return (
-                    <BoardField
-                      key={"h-" + i}
-                      x={x}
-                      y={y}
-                      marble={field.marble ?? undefined}
-                      isSelected={selected === idx}
-                      isHome
-                      bgColor="#fafafb"
-                      onClick={() => onFieldClick(idx)}
-                      size={FIELD_SIZE}
-                      highlight={selected !== null}
-                    />
-                  );
-                })}
             </svg>
             
-            {/* Undo button - moved up */}
-            <button
-              className="absolute bottom-16 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
-              onClick={handleUndo}
-              title="Undo"
-            >
-              <Undo size={28} className="text-blue-600" />
-            </button>
+            <UndoButton onUndo={handleUndo} />
           </div>
           
           <div className="mt-5 text-gray-600 text-md">
