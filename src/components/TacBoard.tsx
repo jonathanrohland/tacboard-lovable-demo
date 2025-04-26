@@ -39,18 +39,18 @@ const CIRCLE_RADIUS = 320;
 
 // Update target and home positions to match reduced field size
 const HOME_POSITIONS2 = [
-  { x: 64, y: 64 }, // TL
-  { x: BOARD_SIZE - 128, y: 64 }, // TR
-  { x: BOARD_SIZE - 128, y: BOARD_SIZE - 128 }, // BR
-  { x: 64, y: BOARD_SIZE - 128 }, // BL
+  { x: 48, y: 48 }, // TL
+  { x: BOARD_SIZE - 112, y: 48 }, // TR
+  { x: BOARD_SIZE - 112, y: BOARD_SIZE - 112 }, // BR
+  { x: 48, y: BOARD_SIZE - 112 }, // BL
 ];
 
 // Target starts positions
 const TARGET_STARTS2 = [
-  { x: CENTER, y: 98, dx: 0, dy: 36 }, // top down (adjusted dy)
-  { x: BOARD_SIZE - 98, y: CENTER, dx: -36, dy: 0 }, // right left (adjusted dx)
-  { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -36 }, // bottom up (adjusted dy)
-  { x: 98, y: CENTER, dx: 36, dy: 0 }, // left right (adjusted dx)
+  { x: CENTER, y: 120, dx: 0, dy: 36 }, // top down
+  { x: BOARD_SIZE - 120, y: CENTER, dx: -36, dy: 0 }, // right left
+  { x: CENTER, y: BOARD_SIZE - 120, dx: 0, dy: -36 }, // bottom up
+  { x: 120, y: CENTER, dx: 36, dy: 0 }, // left right
 ];
 
 function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE_RADIUS) {
@@ -372,9 +372,9 @@ const TacBoard: React.FC = () => {
                 })}
             </svg>
             
-            {/* Undo button */}
+            {/* Undo button - moved up */}
             <button
-              className="absolute bottom-6 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
+              className="absolute bottom-16 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
               onClick={handleUndo}
               title="Undo"
             >
