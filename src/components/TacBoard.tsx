@@ -372,9 +372,9 @@ const TacBoard: React.FC = () => {
                 })}
             </svg>
             
-            {/* Undo button - moved up */}
+            {/* Undo button - moved up further */}
             <button
-              className="absolute bottom-16 right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
+              className="absolute bottom-[calc(16rem-64px)] right-6 z-20 bg-white/90 rounded-full p-3 shadow-md hover:bg-blue-50 transition-all hover-scale"
               onClick={handleUndo}
               title="Undo"
             >
