@@ -37,12 +37,12 @@ const FIELD_SIZE = 36;
 const CENTER = BOARD_SIZE / 2;
 const CIRCLE_RADIUS = 320;
 
-// Update target and home positions to match reduced field size
+// Update target and home positions to match increased field size
 const HOME_POSITIONS2 = [
-  { x: 36, y: 36 }, // TL - Red player, moved slightly from corner
-  { x: BOARD_SIZE - 72, y: 36 }, // TR - Blue player, moved slightly from top border
-  { x: BOARD_SIZE - 72, y: BOARD_SIZE - 72 }, // BR - Green player (already perfect)
-  { x: 36, y: BOARD_SIZE - 72 }, // BL - Yellow player, moved slightly from left border
+  { x: 40, y: 40 }, // TL - Red player, moved slightly from corner
+  { x: BOARD_SIZE - 80, y: 40 }, // TR - Blue player, moved slightly from top border
+  { x: BOARD_SIZE - 80, y: BOARD_SIZE - 80 }, // BR - Green player 
+  { x: 40, y: BOARD_SIZE - 80 }, // BL - Yellow player, moved slightly from left border
 ];
 
 // Target starts positions
