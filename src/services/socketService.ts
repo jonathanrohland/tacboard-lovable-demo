@@ -1,91 +1,66 @@
 
+import { supabase } from "@/integrations/supabase/client";
+import { Field } from "@/types/game";
+import { setGameState } from "@/utils/gameState";
+
 type MessageHandler = (data: any) => void;
 
 class SocketService {
-  private socket: WebSocket | null = null;
+  private channel: any = null;
   private gameId: string | null = null;
   private messageHandlers: Map<string, MessageHandler[]> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private localOnly = false;
 
   connect(gameId: string, fallbackToLocal = false): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
+    if (this.channel) {
       this.disconnect();
     }
 
     this.gameId = gameId;
-    
-    let wsUrl: string;
+    this.localOnly = fallbackToLocal;
     
     if (fallbackToLocal) {
-      // Use local storage only mode - no WebSocket connection
+      // Use local storage only mode - no realtime connection
       console.log('Using local storage mode only (no live sync)');
       this.trigger('connected', { gameId, localOnly: true });
       return;
-    } else {
-      // Try to connect to WebSocket server
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      wsUrl = `${wsProtocol}//livesync.lovable.app/tac-game/${gameId}`;
     }
     
     try {
-      console.log(`Attempting to connect to ${wsUrl}`);
-      this.socket = new WebSocket(wsUrl);
-      
-      this.socket.onopen = () => {
-        console.log(`Connected to game ${gameId}`);
-        this.reconnectAttempts = 0;
-        this.trigger('connected', { gameId });
-        
-        // Clear any pending reconnect timeouts
-        if (this.reconnectTimeout) {
-          clearTimeout(this.reconnectTimeout);
-          this.reconnectTimeout = null;
-        }
-      };
-      
-      this.socket.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message && message.type) {
-            this.trigger(message.type, message.data);
-          }
-        } catch (error) {
-          console.error('Error processing message:', error);
-        }
-      };
-      
-      this.socket.onclose = (event) => {
-        console.log(`Disconnected from game ${gameId}`, event.code, event.reason);
-        this.trigger('disconnected', { 
-          gameId, 
-          code: event.code,
-          reason: event.reason || 'Unknown reason'
-        });
-        
-        // Auto reconnect logic
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          console.log(`Reconnect attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
-          
-          this.reconnectTimeout = setTimeout(() => {
-            if (this.gameId) {
-              this.connect(this.gameId, this.reconnectAttempts >= this.maxReconnectAttempts);
+      console.log(`Attempting to connect to game ${gameId} using Supabase Realtime`);
+      // Set up Supabase realtime channel
+      this.channel = supabase
+        .channel(`game-${gameId}`)
+        .on('broadcast', { event: 'gameUpdate' }, (payload) => {
+          try {
+            if (payload.payload && payload.payload.fields) {
+              this.trigger('gameUpdate', { fields: payload.payload.fields });
             }
-          }, 1000 * this.reconnectAttempts);
-        } else {
-          console.log('Max reconnect attempts reached, falling back to local storage only');
-          this.trigger('fallback', { gameId, localOnly: true });
-        }
-      };
-      
-      this.socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        // Don't need to do anything here as onclose will be called automatically after an error
-      };
+          } catch (error) {
+            console.error('Error processing message:', error);
+          }
+        })
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`Connected to game ${gameId}`);
+            this.reconnectAttempts = 0;
+            this.trigger('connected', { gameId });
+            
+            // Clear any pending reconnect timeouts
+            if (this.reconnectTimeout) {
+              clearTimeout(this.reconnectTimeout);
+              this.reconnectTimeout = null;
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+            console.error(`Channel error for game ${gameId}:`, status);
+            this.handleDisconnection(status);
+          }
+        });
     } catch (error) {
-      console.error('Failed to connect to WebSocket:', error);
+      console.error('Failed to connect to Supabase Realtime:', error);
       this.trigger('error', { 
         gameId, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -94,7 +69,33 @@ class SocketService {
       // Fall back to local mode
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         this.trigger('fallback', { gameId, localOnly: true });
+        this.localOnly = true;
       }
+    }
+  }
+
+  private handleDisconnection(reason: string): void {
+    console.log(`Disconnected from game ${this.gameId}`, reason);
+    this.trigger('disconnected', { 
+      gameId: this.gameId, 
+      code: 0,
+      reason: reason || 'Unknown reason'
+    });
+    
+    // Auto reconnect logic
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Reconnect attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
+      
+      this.reconnectTimeout = setTimeout(() => {
+        if (this.gameId) {
+          this.connect(this.gameId, this.reconnectAttempts >= this.maxReconnectAttempts);
+        }
+      }, 1000 * this.reconnectAttempts);
+    } else {
+      console.log('Max reconnect attempts reached, falling back to local storage only');
+      this.trigger('fallback', { gameId: this.gameId, localOnly: true });
+      this.localOnly = true;
     }
   }
 
@@ -104,24 +105,30 @@ class SocketService {
       this.reconnectTimeout = null;
     }
     
-    if (this.socket) {
-      // Only try to close if the connection is not already closing or closed
-      if (this.socket.readyState !== WebSocket.CLOSING && this.socket.readyState !== WebSocket.CLOSED) {
-        this.socket.close();
-      }
-      this.socket = null;
+    if (this.channel) {
+      supabase.removeChannel(this.channel);
+      this.channel = null;
       this.gameId = null;
       this.reconnectAttempts = 0;
+      this.localOnly = false;
     }
   }
 
-  sendUpdate(fields: any): void {
-    if (this.socket?.readyState === WebSocket.OPEN && this.gameId) {
-      this.socket.send(JSON.stringify({
-        type: 'gameUpdate',
-        gameId: this.gameId,
-        data: { fields }
-      }));
+  sendUpdate(fields: Field[]): void {
+    if (this.gameId) {
+      // First save to database
+      if (!this.localOnly) {
+        setGameState(this.gameId, fields);
+      }
+      
+      // Then broadcast via realtime
+      if (this.channel && !this.localOnly) {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'gameUpdate',
+          payload: { fields }
+        });
+      }
     }
   }
 
@@ -154,7 +161,7 @@ class SocketService {
   }
 
   isConnected(): boolean {
-    return this.socket?.readyState === WebSocket.OPEN;
+    return this.channel !== null || this.localOnly;
   }
 }
 

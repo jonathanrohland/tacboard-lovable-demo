@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { socketService } from '@/services/socketService';
 import { generateGameId, loadGameState, saveGameState } from '@/utils/gameState';
-import { Field, GameState } from '@/types/game';
+import { Field } from '@/types/game';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Share2, CopyIcon, RefreshCw, WifiOff } from 'lucide-react';
@@ -49,7 +49,7 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     
     const handleDisconnect = (data: any) => {
       setIsConnected(false);
-      setConnectionError(`Disconnected (code: ${data.code}${data.reason ? ', ' + data.reason : ''})`);
+      setConnectionError(`Disconnected (${data.reason || 'Unknown reason'})`);
     };
     
     const handleError = (data: any) => {
