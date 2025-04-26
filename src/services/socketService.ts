@@ -13,6 +13,7 @@ class SocketService {
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private localOnly = false;
+  private isProcessingRemoteUpdate = false; // Flag to track if we're processing a remote update
 
   connect(gameId: string, fallbackToLocal = false): void {
     if (this.channel) {
@@ -39,12 +40,21 @@ class SocketService {
             // Ensure we are receiving the fields data correctly
             if (payload.payload && payload.payload.fields) {
               console.log('Received game update:', payload.payload.fields.length, 'fields');
+              
+              // Set flag to indicate we're processing a remote update
+              this.isProcessingRemoteUpdate = true;
+              
               this.trigger('gameUpdate', { fields: payload.payload.fields });
+              
+              // Reset flag after processing is complete
+              this.isProcessingRemoteUpdate = false;
             } else {
               console.warn('Received game update with missing fields data:', payload);
             }
           } catch (error) {
             console.error('Error processing message:', error);
+            // Make sure to reset the flag even if an error occurs
+            this.isProcessingRemoteUpdate = false;
           }
         })
         .subscribe((status: string) => {
@@ -119,6 +129,12 @@ class SocketService {
   }
 
   sendUpdate(fields: Field[]): void {
+    // Don't send updates that originated from another client
+    if (this.isProcessingRemoteUpdate) {
+      console.log('Skipping sending update as it originated from a remote client');
+      return;
+    }
+    
     if (!this.gameId) {
       console.error('Cannot send update: No game ID');
       return;
@@ -152,6 +168,11 @@ class SocketService {
     } else {
       console.warn('Cannot send update: No channel');
     }
+  }
+
+  // Method to check if we're currently processing a remote update
+  isRemoteUpdate(): boolean {
+    return this.isProcessingRemoteUpdate;
   }
 
   on(event: string, handler: MessageHandler): void {

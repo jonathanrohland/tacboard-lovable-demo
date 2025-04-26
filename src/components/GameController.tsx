@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { socketService } from '@/services/socketService';
@@ -26,14 +25,12 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
   const [joinInput, setJoinInput] = useState('');
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // On first load, check if we have a game ID in the URL
   useEffect(() => {
     if (gameId) {
       joinExistingGame(gameId);
     }
   }, []);
 
-  // Socket connection handling
   useEffect(() => {
     const handleConnect = (data: any) => {
       setIsConnected(true);
@@ -85,7 +82,6 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     };
   }, [onFieldsUpdate]);
 
-  // Create a new game
   const createNewGame = () => {
     const newGameId = generateGameId();
     setGameId(newGameId);
@@ -95,7 +91,6 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     toast.success(`New game created: ${newGameId}`);
   };
 
-  // Join an existing game
   const joinExistingGame = (id: string) => {
     if (!id) return;
     
@@ -107,14 +102,12 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
     setGameId(id);
     navigate(`/?game=${id}`, { replace: true });
     
-    // Attempt to load from local storage first
     const savedState = loadGameState(id);
     if (savedState) {
       onFieldsUpdate(savedState);
     }
   };
 
-  // Copy the game URL to clipboard
   const copyGameUrl = () => {
     const url = `${window.location.origin}/?game=${gameId}`;
     navigator.clipboard.writeText(url)
@@ -122,7 +115,6 @@ const GameController: React.FC<GameControllerProps> = ({ initialFields, onFields
       .catch(() => toast.error('Failed to copy URL'));
   };
 
-  // Submit handler for joining a game
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (joinInput.trim()) {

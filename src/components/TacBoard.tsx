@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import BoardField from "./BoardField";
 import { Undo } from "lucide-react";
@@ -249,7 +248,7 @@ const TacBoard: React.FC = () => {
     
     // Then send update through WebSocket service
     if (gameId) {
-      console.log("Sending update to WebSocket:", next.length, "fields");
+      console.log("Sending update to WebSocket (local user action):", next.length, "fields");
       socketService.sendUpdate(next);
     }
   }, [fields, selected, gameId]);
@@ -263,7 +262,7 @@ const TacBoard: React.FC = () => {
     
     // Send the undo state through the WebSocket
     if (gameId) {
-      console.log("Sending undo update to WebSocket");
+      console.log("Sending undo update to WebSocket (local user action)");
       socketService.sendUpdate(previousState);
     }
   }
@@ -273,8 +272,9 @@ const TacBoard: React.FC = () => {
     setFields(updatedFields);
     setSelected(null);
     
-    // Send the update through the WebSocket
-    if (gameId) {
+    // Send the update through the WebSocket if it's a local action (not from socket)
+    if (gameId && !socketService.isRemoteUpdate()) {
+      console.log("Sending update from game controller (local user action)");
       socketService.sendUpdate(updatedFields);
     }
   }, [gameId]);
