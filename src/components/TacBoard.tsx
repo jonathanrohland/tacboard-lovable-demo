@@ -38,6 +38,22 @@ const FIELD_SIZE = 36;
 const CENTER = BOARD_SIZE / 2;
 const CIRCLE_RADIUS = 320;
 
+// Update target and home positions to match reduced field size
+const HOME_POSITIONS2 = [
+  { x: 64, y: 64 }, // TL
+  { x: BOARD_SIZE - 128, y: 64 }, // TR
+  { x: BOARD_SIZE - 128, y: BOARD_SIZE - 128 }, // BR
+  { x: 64, y: BOARD_SIZE - 128 }, // BL
+];
+
+// Target starts positions
+const TARGET_STARTS2 = [
+  { x: CENTER, y: 98, dx: 0, dy: 36 }, // top down (adjusted dy)
+  { x: BOARD_SIZE - 98, y: CENTER, dx: -36, dy: 0 }, // right left (adjusted dx)
+  { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -36 }, // bottom up (adjusted dy)
+  { x: 98, y: CENTER, dx: 36, dy: 0 }, // left right (adjusted dx)
+];
+
 function getCirclePos2(idx: number, total = 64, center = CENTER, radius = CIRCLE_RADIUS) {
   const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
   return {
@@ -101,33 +117,57 @@ const TacBoard: React.FC = () => {
   // Fetch initial state from Supabase (or fallback to local storage)
   useEffect(() => {
     if (!gameId) return; // no game to sync
+    
     let mounted = true;
-    (async () => {
-      // Try Supabase first
-      const supabaseFields = await getGameState(gameId);
-      if (supabaseFields && mounted) {
-        setFields(supabaseFields);
-        return;
+    
+    const loadInitialState = async () => {
+      try {
+        // Try Supabase first
+        const supabaseFields = await getGameState(gameId);
+        if (supabaseFields && mounted) {
+          console.log("Loaded game state from Supabase:", supabaseFields.length, "fields");
+          setFields(supabaseFields);
+          return;
+        }
+        
+        // Fall back to localStorage
+        const localFields = loadGameState(gameId);
+        if (localFields && mounted) {
+          console.log("Loaded game state from local storage:", localFields.length, "fields");
+          setFields(localFields);
+        }
+      } catch (error) {
+        console.error("Error loading initial game state:", error);
       }
-      // Fall back to localStorage
-      const localFields = loadGameState(gameId);
-      if (localFields && mounted) setFields(localFields);
-    })();
+    };
+    
+    loadInitialState();
     return () => {
       mounted = false;
     };
   }, [gameId]);
 
-  // Update game state in Supabase+localStorage when fields change
+  // Set up WebSocket handling for game updates
   useEffect(() => {
     if (!gameId) return;
-    // Write to local storage for offline play
-    saveGameState(gameId, fields);
-    // Write to Supabase
-    setGameState(gameId, fields);
-    // WebSocket broadcast for live updates
-    socketService.sendUpdate(fields);
-  }, [fields, gameId]);
+    
+    const handleGameUpdate = (data: { fields: Field[] }) => {
+      console.log("Received game update via WebSocket:", data.fields.length, "fields");
+      setFields(data.fields);
+    };
+    
+    // Connect to the WebSocket
+    socketService.connect(gameId);
+    
+    // Register handler for game updates
+    socketService.on('gameUpdate', handleGameUpdate);
+    
+    // Clean up on unmount
+    return () => {
+      socketService.off('gameUpdate', handleGameUpdate);
+      socketService.disconnect();
+    };
+  }, [gameId]);
 
   // Helper for finding field's location on board
   function fieldPos(field: Field) {
@@ -135,7 +175,7 @@ const TacBoard: React.FC = () => {
       return getCirclePos2(field.idx);
     }
     if (field.type === "target") {
-      const start = TARGET_STARTS[field.player];
+      const start = TARGET_STARTS2[field.player];
       const { dx, dy } = start;
       return {
         x: start.x + dx * field.idx,
@@ -202,37 +242,42 @@ const TacBoard: React.FC = () => {
     // Move marble
     next[idx].marble = marble;
     next[selected].marble = undefined;
+    
+    // Update fields locally first
     setFields(next);
     setSelected(null);
-  }, [fields, selected]);
+    
+    // Then send update through WebSocket service
+    if (gameId) {
+      console.log("Sending update to WebSocket:", next.length, "fields");
+      socketService.sendUpdate(next);
+    }
+  }, [fields, selected, gameId]);
 
   function handleUndo() {
     if (history.length === 0) return;
-    setFields(cloneFields(history[history.length - 1]));
+    const previousState = cloneFields(history[history.length - 1]);
+    setFields(previousState);
     setHistory(h => h.slice(0, h.length - 1));
     setSelected(null);
+    
+    // Send the undo state through the WebSocket
+    if (gameId) {
+      console.log("Sending undo update to WebSocket");
+      socketService.sendUpdate(previousState);
+    }
   }
-
-  // Update target and home positions to match reduced field size
-  const HOME_POSITIONS2 = [
-    { x: 64, y: 64 }, // TL
-    { x: BOARD_SIZE - 128, y: 64 }, // TR
-    { x: BOARD_SIZE - 128, y: BOARD_SIZE - 128 }, // BR
-    { x: 64, y: BOARD_SIZE - 128 }, // BL
-  ];
-
-  const TARGET_STARTS = [
-    { x: CENTER, y: 98, dx: 0, dy: 36 }, // top down (adjusted dy)
-    { x: BOARD_SIZE - 98, y: CENTER, dx: -36, dy: 0 }, // right left (adjusted dx)
-    { x: CENTER, y: BOARD_SIZE - 98, dx: 0, dy: -36 }, // bottom up (adjusted dy)
-    { x: 98, y: CENTER, dx: 36, dy: 0 }, // left right (adjusted dx)
-  ];
 
   // Handle fields update from the game controller
   const handleFieldsUpdate = useCallback((updatedFields: Field[]) => {
     setFields(updatedFields);
     setSelected(null);
-  }, []);
+    
+    // Send the update through the WebSocket
+    if (gameId) {
+      socketService.sendUpdate(updatedFields);
+    }
+  }, [gameId]);
 
   return (
     <div className="flex flex-col items-center justify-center">

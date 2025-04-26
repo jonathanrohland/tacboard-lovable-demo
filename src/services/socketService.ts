@@ -36,8 +36,12 @@ class SocketService {
         .channel(`game-${gameId}`)
         .on('broadcast', { event: 'gameUpdate' }, (payload) => {
           try {
+            // Ensure we are receiving the fields data correctly
             if (payload.payload && payload.payload.fields) {
+              console.log('Received game update:', payload.payload.fields.length, 'fields');
               this.trigger('gameUpdate', { fields: payload.payload.fields });
+            } else {
+              console.warn('Received game update with missing fields data:', payload);
             }
           } catch (error) {
             console.error('Error processing message:', error);
@@ -115,20 +119,38 @@ class SocketService {
   }
 
   sendUpdate(fields: Field[]): void {
-    if (this.gameId) {
-      // First save to database
-      if (!this.localOnly) {
-        setGameState(this.gameId, fields);
-      }
-      
-      // Then broadcast via realtime
-      if (this.channel && !this.localOnly) {
+    if (!this.gameId) {
+      console.error('Cannot send update: No game ID');
+      return;
+    }
+    
+    console.log(`Sending update for game ${this.gameId} with ${fields.length} fields`);
+    
+    // First save to database
+    if (!this.localOnly) {
+      setGameState(this.gameId, fields)
+        .catch(error => console.error('Error saving game state to Supabase:', error));
+    }
+    
+    // Then broadcast via realtime
+    if (this.channel && !this.localOnly) {
+      try {
         this.channel.send({
           type: 'broadcast',
           event: 'gameUpdate',
           payload: { fields }
         });
+        console.log('Update sent to channel');
+      } catch (error) {
+        console.error('Error sending update through channel:', error);
       }
+    } else if (this.localOnly) {
+      console.log('Local only mode: Not broadcasting update');
+      // In local-only mode, we still need to trigger the update locally
+      // to ensure the UI updates correctly
+      this.trigger('gameUpdate', { fields });
+    } else {
+      console.warn('Cannot send update: No channel');
     }
   }
 
